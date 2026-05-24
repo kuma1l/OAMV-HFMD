@@ -9,6 +9,7 @@ numpy>=1.26,<2.0
 pillow>=10.0
 pandas>=2.0
 pyyaml>=6.0
+kaggle>=1.6              # for re-downloading Hotels-8k on cloud VMs (bootstrap_vast.sh)
 
 # Eval + analysis
 scikit-learn>=1.3
