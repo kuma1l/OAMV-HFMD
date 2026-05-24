@@ -68,7 +68,6 @@ banner "4/8  Verifying Kaggle credentials"
 if [[ -z "${KAGGLE_API_TOKEN:-}" ]] && [[ ! -f "${HOME}/.kaggle/access_token" ]] && [[ ! -f "${HOME}/.kaggle/kaggle.json" ]]; then
   die "No Kaggle credentials found. See header of this script for setup options."
 fi
-# Smoke-test the credentials with a cheap API call
 kaggle competitions list --search hotel-id-2021 | head -3 \
   || die "Kaggle API call failed — check token validity, expiry, and rules-accepted status."
 
@@ -83,14 +82,28 @@ else
   ls -lh "${KAGGLE_COMP}.zip"
 fi
 
-# --- Stage 6: extract ------------------------------------------------------
-banner "6/8  Extracting"
+# --- Stage 6: extract + free the zip immediately to save 24 GB -------------
+banner "6/8  Extracting (and removing zip after success to reclaim 24 GB)"
 if [[ -d "${RAW_DIR}/train_images" ]] && [[ -f "${RAW_DIR}/train.csv" ]]; then
   echo "  already extracted, skipping"
+  [[ -f "${KAGGLE_COMP}.zip" ]] && { echo "  removing leftover zip..."; rm "${KAGGLE_COMP}.zip"; }
 else
+  # Pre-flight: need ~30 GB free for zip + extracted tree to coexist briefly.
+  free_kb=$(df -P "${RAW_DIR}" | awk 'NR==2 {print $4}')
+  free_gb=$((free_kb / 1024 / 1024))
+  if [[ "${free_gb}" -lt 30 ]]; then
+    die "Only ${free_gb} GB free in ${RAW_DIR}; need ~30 GB headroom to extract safely. Free space or resize instance."
+  fi
   unzip -q "${KAGGLE_COMP}.zip"
+  if [[ -d "${RAW_DIR}/train_images" ]] && [[ -f "${RAW_DIR}/train.csv" ]]; then
+    echo "  extraction OK, removing zip to reclaim 24 GB..."
+    rm "${KAGGLE_COMP}.zip"
+  else
+    die "Extraction completed but train_images/ or train.csv missing — not deleting zip. Investigate."
+  fi
 fi
 ls "${RAW_DIR}" | head -10
+df -h "${RAW_DIR}" | tail -1
 
 # --- Stage 7: per-hotel reorganization + splits ----------------------------
 banner "7/8  Reorganizing into per-hotel layout + building splits"
@@ -116,10 +129,10 @@ total_got = sum(got.values()); total_exp = sum(exp.values())
 print(f"          got      expected  diff")
 for s in ("train", "val", "test"):
     print(f"  {s:6s} {got[s]:>7d}  {exp[s]:>7d}  {got[s]-exp[s]:+d}")
-# Strict equality is ideal but ±0.1% is acceptable (a few image files in the
-# Kaggle archive may differ from the snapshot used to compute PLAN's numbers).
+# Strict equality is ideal but +/- 0.1% is acceptable (a few image files in
+# the Kaggle archive may differ from the snapshot used to compute PLAN's numbers).
 if abs(total_got - total_exp) / total_exp > 0.001:
-    print(f"FAIL: total off by {total_got-total_exp} (>0.1%) — investigate before E1.")
+    print(f"FAIL: total off by {total_got-total_exp} (>0.1%) -- investigate before E1.")
     sys.exit(1)
 print("OK (within tolerance).")
 PYEOF
