@@ -1,0 +1,13 @@
+# E11: CheXpert MV cross-domain. PLAN.md §6.E11 (STRETCH-appendix).
+# Only attempted if main paper locks by week 7.
+inherits: base.yaml
+
+method: "chexpert_mv"
+paths:
+  data_dir: "../chexpert_mv_data"
+  out_dir:  "./results/E11_chexpert"
+
+# Multi-label, not single-class — driver script handles separately.
+model:
+  num_classes: 14                    # CheXpert's 14 pathologies
+  variant: "overlap_aware"

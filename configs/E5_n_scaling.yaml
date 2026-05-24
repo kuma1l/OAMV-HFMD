@@ -1,0 +1,14 @@
+# E5: N-scaling. Headline Figure 1. PLAN.md §6.E5, §18 claim 4.
+inherits: base.yaml
+
+method: "n_scaling"
+
+paths:
+  out_dir: "./results/E5_n_scaling"
+
+# Trains both methods at each N. Reuses E1/E2 checkpoints at N=2 and N=4
+# (configured via --reuse-existing flag in the driver script).
+sweep:
+  methods: ["mvhfmd_baseline", "oamvhfmd_combined"]
+  n_views: [2, 4, 6, 8]
+  seeds:   [42, 1337, 2024]

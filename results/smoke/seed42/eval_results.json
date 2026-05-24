@@ -1,0 +1,28 @@
+{
+  "test_top1": 0.9307257533073425,
+  "test_top5": 0.9741194248199463,
+  "single_view_top1": 0.49526000022888184,
+  "n_test_hotels": 7754,
+  "n_test_samples": 15417,
+  "n_views": 4,
+  "eval_mode": "exhaustive_combinations",
+  "best_checkpoint_epoch": 1,
+  "best_val_top1": 0.9421916890080428,
+  "elapsed_train_seconds": 21888.007135868073,
+  "per_view_metrics": {
+    "single": {
+      "top1_acc": 0.49526000022888184,
+      "top2_acc": 0.5688021183013916,
+      "top5_acc": 0.6523987650871277,
+      "top10_acc": 0.7055444121360779,
+      "top100_acc": 0.8520540595054626
+    },
+    "mv_collection": {
+      "top1_acc": 0.9307257533073425,
+      "top2_acc": 0.9545955061912537,
+      "top5_acc": 0.9741194248199463,
+      "top10_acc": 0.9843029975891113,
+      "top100_acc": 0.9963027238845825
+    }
+  }
+}

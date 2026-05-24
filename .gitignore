@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Results — checkpoints are huge; keep only structured outputs
+results/**/*.pt
+results/**/*.pth
+results/**/*.ckpt
+results/**/checkpoints/
+
+# Logs
+*.log
+results/**/train.log
+
+# But DO commit:
+# - configs (versioned alongside code)
+# - results/**/config.json (one-line metadata per run)
+# - results/**/eval_results.json (final numbers)
+# - results/**/convergence_report.json
+# - results/tables/*.csv (aggregated)
+!results/**/config.json
+!results/**/eval_results.json
+!results/**/convergence_report.json
+!results/tables/*.csv
+
+# Data — none of this lives in the repo
+mvhfmd_data/
+hotels-8k/
+images/
+
+# Paper build artifacts
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.log
+paper/*.out
+paper/*.pdf
+!paper/figures/*.pdf
+paper/
+
+CLAUDE.md 
+docs/
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+# E3: Embedding-only ablation (C2 isolated). PLAN.md §6.E3, §18 claim 2.
+inherits: base.yaml
+
+method: "oamvhfmd_embed_only"
+model:
+  variant: "overlap_aware"
+  enable_overlap_embed: true
+  enable_overlap_md_loss: false      # keep MV-HFMD's uniform L_md
+
+paths:
+  out_dir: "./results/E3_embed_only"
+
+sweep:
+  n_views: [4]
+  seeds:   [42, 1337, 2024]

@@ -1,0 +1,15 @@
+# E4: Loss-only ablation (C3 isolated). PLAN.md §6.E4, §18 claim 3.
+inherits: base.yaml
+
+method: "oamvhfmd_loss_only"
+model:
+  variant: "overlap_aware"
+  enable_overlap_embed: false        # keep static E_img
+  enable_overlap_md_loss: true
+
+paths:
+  out_dir: "./results/E4_loss_only"
+
+sweep:
+  n_views: [4]
+  seeds:   [42, 1337, 2024]

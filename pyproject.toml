@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oamv_hfmd"
+version = "0.1.0"
+description = "Overlap-Aware Multi-View Hybrid Fusion with Mutual Distillation"
+requires-python = ">=3.10"
+authors = [{name = "Kumail"}]
+readme = "README.md"
+
+[tool.setuptools.packages.find]
+include = ["oamv_hfmd*"]
+exclude = ["tests*", "scripts*", "paper*", "notes*", "docs*", "results*"]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

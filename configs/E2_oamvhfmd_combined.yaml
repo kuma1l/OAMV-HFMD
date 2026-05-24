@@ -1,0 +1,15 @@
+# E2: OAMV-HFMD combined (embed + loss). Headline result. PLAN.md §6.E2, §18 claim 5.
+inherits: base.yaml
+
+method: "oamvhfmd_combined"
+model:
+  variant: "overlap_aware"           # uses OverlapAwareHybrid
+  enable_overlap_embed: true
+  enable_overlap_md_loss: true
+
+paths:
+  out_dir: "./results/E2_oamvhfmd_combined"
+
+sweep:
+  n_views: [4]
+  seeds:   [42, 1337, 2024]

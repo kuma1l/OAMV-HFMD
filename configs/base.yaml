@@ -1,0 +1,66 @@
+# OAMV-HFMD base config. Per-experiment YAMLs override fields here.
+# All paths are relative to the repo root unless absolute.
+# PLAN.md §5. Hyperparameters revised 2026-05-23 against multi-view-hybrid/main.py.
+
+paths:
+  data_dir:        "../mvhfmd_data"
+  train_npy:       "${paths.data_dir}/train.npy"
+  val_npy:         "${paths.data_dir}/val.npy"
+  test_npy:        "${paths.data_dir}/test.npy"
+  out_dir:         "./results/<set-per-experiment>"
+
+# Model
+model:
+  arch:            "vit_small_r26_s32_224"   # PLAN.md §4.1; locked by Sanity Stream 4
+  pretrained:      true
+  num_classes:     7754                       # Stream 3 fallback split's class count
+  n_views:         4                          # main.py default is 2; we set 4 as our common choice
+
+# Oracle (used by OverlapAwareHybrid; ignored by MV-HFMD baseline)
+oracle:
+  kind:            "dinov2_s"                 # dinov2_s | clip_b16 | siglip_b16 | resnet50_in1k | random_cnn
+  mlp_hidden:      64
+
+# Optimizer + schedule — matches multi-view-hybrid/main.py exactly
+train:
+  optimizer:       "sgd"                      # SGD, NOT AdamW
+  lr:              0.01                       # main.py default; OneCycleLR max_lr
+  weight_decay:    5.0e-4                     # main.py default
+  momentum:        0.9                        # main.py default
+  scheduler:       "onecycle"                 # OneCycleLR with cosine anneal
+  onecycle:
+    div_factor:        10.0                   # initial_lr = max_lr / div_factor = 0.001
+    final_div_factor:  1000.0                 # min_lr = max_lr / (div_factor * final_div_factor)
+    pct_start_epochs:  5                      # main.py uses pct_start = 5 / num_epochs (5 warmup epochs)
+    anneal_strategy:   "cos"
+  epochs:          50                         # main.py default
+  batch_size:      64                         # main.py train batch
+  val_batch_size:  128                        # main.py val/test batch
+  grad_clip:       80.0                       # main.py default (large because no label smoothing)
+  label_smoothing: 0.0                        # NONE — main.py uses nn.CrossEntropyLoss(ignore_index=-1)
+  ce_ignore_index: -1                         # CE ignores -1 labels (used in some upstream contexts)
+  amp:             true                       # torch.cuda.amp.autocast in trainer
+  num_workers:     8                          # main.py default
+
+# Loss weights — md_loss applies Hinton-style temp^2 * lambda scaling internally
+loss:
+  ce_single_weight: 1.0                       # plain unweighted CE sums for both branches
+  ce_mv_weight:     1.0
+  lambda_md:        0.1                       # main.py md_lambda default
+  md_temp:          4.0                       # main.py md_temp default
+  tau_overlap:      4.0                       # softmax temperature on S rows (our overlap weighting)
+
+# Seeds — three production seeds. PLAN.md §5.4.
+seeds: [42, 1337, 2024]
+
+# Convergence thresholds. PLAN.md §5.5.
+convergence:
+  min_effective_epochs:   5
+  min_loss_reduction:     0.20
+  max_train_val_gap_pp:   20
+  max_val_delta_last3_pp: 0.5
+
+# Eval — exhaustive C(M, N) enumeration happens in HotelsDataset.__init__(train=False),
+# not in a separate eval loop. Just iterate the test DataLoader once.
+eval:
+  exhaustive_combos_in_dataset: true

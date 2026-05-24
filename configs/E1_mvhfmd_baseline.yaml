@@ -1,0 +1,15 @@
+# E1: MV-HFMD reproduction. PLAN.md §6.E1, §18 claim 1.
+# Pass criterion: mean test_top1 within 0.5 pp of paper (46.3/65.1/~70 % for single/N2/N4).
+inherits: base.yaml
+
+method: "mvhfmd_baseline"
+model:
+  variant: "baseline"                # uses MultiImageHybrid, static E_img, uniform L_md
+
+paths:
+  out_dir: "./results/E1_mvhfmd_baseline"
+
+# Sweep N over {single, 2, 4}. Driver script iterates configs/n_values.
+sweep:
+  n_views: ["single", 2, 4]
+  seeds:   [42, 1337, 2024]

@@ -1,0 +1,17 @@
+# E6: HMDMV reproduction + head-to-head. PLAN.md §6.E6, §18 claim 6.
+inherits: base.yaml
+
+method: "hmdmv_baseline"
+model:
+  variant: "hmdmv"                   # uncertainty-weighted MV-HFMD
+
+paths:
+  out_dir: "./results/E6_hmdmv_baseline"
+
+sweep:
+  n_views: [4]
+  seeds:   [42, 1337, 2024]
+
+# Combined-with-our-method baseline for additivity test
+combined_with_oamvhfmd_embed:
+  enabled: true                      # bolt MLP(S) embedding onto HMDMV uncertainty weighting

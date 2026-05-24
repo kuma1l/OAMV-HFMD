@@ -1,0 +1,17 @@
+# E7: Foundation-model ablation. PLAN.md §6.E7, §18 claim 7.
+# THE LOAD-BEARING CONTROL — random_cnn must underperform DINOv2-S by ≥ 1.0 pp.
+inherits: base.yaml
+
+method: "oracle_ablation"
+model:
+  variant: "overlap_aware"
+  enable_overlap_embed: true
+  enable_overlap_md_loss: true
+
+paths:
+  out_dir: "./results/E7_oracle_ablation"
+
+sweep:
+  oracle_kind: ["dinov2_s", "clip_b16", "siglip_b16", "resnet50_in1k", "random_cnn"]
+  n_views: [4]
+  seeds:   [42]                      # 1 seed per oracle (compute budget)

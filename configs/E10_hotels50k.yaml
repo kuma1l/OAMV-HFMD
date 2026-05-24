@@ -1,0 +1,21 @@
+# E10: Scaling robustness on Hotels-50K. PLAN.md §6.E10 (STRETCH-appendix), §18 claim 8.
+inherits: base.yaml
+
+method: "hotels50k_scaling"
+model:
+  variant: "overlap_aware"
+  enable_overlap_embed: true
+  enable_overlap_md_loss: true
+
+paths:
+  # Hotels-50K data lives elsewhere; manifest builder needs to handle the per-hotel layout.
+  data_dir: "../hotels50k_data"
+  out_dir:  "./results/E10_hotels50k"
+
+# Larger class set — confirm class count from the Stream 3-style manifest build.
+model:
+  num_classes: 11002                 # placeholder; verified by manifest audit
+
+sweep:
+  n_views: [4]
+  seeds:   [42, 1337, 2024]
