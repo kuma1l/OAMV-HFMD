@@ -111,6 +111,7 @@ def main():
     batch_size = args.batch_size if args.batch_size is not None else cfg["train"]["batch_size"]
     val_batch_size = cfg["train"].get("val_batch_size", 128)
     num_workers = args.num_workers if args.num_workers is not None else cfg["train"]["num_workers"]
+    dl_extras = dict(persistent_workers=True, prefetch_factor=4) if num_workers > 0 else {}
 
     out_root = Path(args.out_dir or cfg["paths"]["out_dir"])
     # When --out-dir is given by the user, honor the spec's seedXX layout
@@ -168,17 +169,17 @@ def main():
     train_loader = DataLoader(
         ds_train, batch_size=batch_size, shuffle=True,
         num_workers=num_workers, drop_last=False, pin_memory=pin,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn, **dl_extras,
     )
     val_loader = DataLoader(
         ds_val, batch_size=val_batch_size, shuffle=False,
         num_workers=num_workers, drop_last=False, pin_memory=pin,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn, **dl_extras,
     )
     test_loader = DataLoader(
         ds_test, batch_size=val_batch_size, shuffle=False,
         num_workers=num_workers, drop_last=False, pin_memory=pin,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn, **dl_extras,
     )
 
     # --- model
@@ -258,7 +259,7 @@ def main():
     per_image_loader = DataLoader(
         ds_per_image, batch_size=val_batch_size, shuffle=False,
         num_workers=num_workers, drop_last=False, pin_memory=pin,
-        worker_init_fn=worker_init_fn,
+        worker_init_fn=worker_init_fn, **dl_extras,
     )
     # The trained model has n=n_views. Load its weights into a fresh n=1 copy
     # (img_embed_matrix shape differs; strict=False skips that one parameter,
@@ -266,7 +267,7 @@ def main():
     per_image_model = MultiImageHybrid(
         arch=arch, num_classes=ds_train.num_classes, n=1, pretrained_weights=False,
     ).to(device)
-    missing, unexpected = per_image_model.load_state_dict(model.state_dict(), strict=False)
+    _sd = {k: v for k, v in model.state_dict().items() if k != "img_embed_matrix"}; missing, unexpected = per_image_model.load_state_dict(_sd, strict=False)
     logger.info(f"per-image model load: missing={len(missing)} unexpected={len(unexpected)} "
                 f"(img_embed_matrix shape mismatch is expected)")
     per_image_model.eval()

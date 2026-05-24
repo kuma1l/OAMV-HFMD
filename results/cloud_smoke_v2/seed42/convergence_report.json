@@ -1,0 +1,19 @@
+{
+  "status": "UNDERTRAINED",
+  "diagnosis": "fewer than 5 effective epochs of full coverage",
+  "epochs_completed": 1,
+  "effective_epochs": 1.0,
+  "initial_loss": 17.90625,
+  "final_loss": 11.3726902118949,
+  "loss_reduction_frac": 0.36487593930080836,
+  "val_top1_trajectory": [
+    0.0,
+    0.9703418230563002
+  ],
+  "val_top1_delta_last_3_epochs_pp": 0.0,
+  "final_train_val_gap_pp": -61.356148891971074,
+  "max_train_val_gap_pp": -61.356148891971074,
+  "best_qualifying_ckpt_epoch": 1,
+  "best_val_top1": 0.9703418230563002,
+  "elapsed_train_seconds": 656.9947657585144
+}
