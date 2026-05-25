@@ -1,0 +1,9 @@
+{
+  "test_top1": 0.9873515963554382,
+  "test_top5": 0.9979243278503418,
+  "single_view_top1": 0.7848320007324219,
+  "n_views": 4,
+  "epochs_trained": 10,
+  "seed": 42,
+  "note": "Training interrupted at epoch 10/50 by accidental Ctrl+C during text copy; val trajectory was 98.53% (ep 5) -> 99.25% (ep 10), confirming near-ceiling saturation on Stream 3 fallback split. No restart \u2014 marginal value too low vs cost."
+}

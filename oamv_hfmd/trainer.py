@@ -352,28 +352,30 @@ class Trainer:
         t_start = time.time()
         for epoch in range(1, self.cfg.epochs + 1):
             train_report = self.train_one_epoch(epoch)
-            val_report = self.evaluate(self.val_loader)
-            self._val_top1_trajectory.append(val_report["top1"])
-            self.logger.info(
-                f"epoch {epoch} val: top1={val_report['top1']:.4f} top5={val_report['top5']:.4f}"
-            )
+            # Val every 5 epochs + final epoch (saves ~80% of val compute).
+            if epoch % 5 == 0 or epoch == self.cfg.epochs:
+                val_report = self.evaluate(self.val_loader)
+                self._val_top1_trajectory.append(val_report["top1"])
+                self.logger.info(
+                    f"epoch {epoch} val: top1={val_report['top1']:.4f} top5={val_report['top5']:.4f}"
+                )
 
-            # Best-checkpoint with overfit-gap guard.
-            train_top1 = (
-                train_report.get("train_top1_mv_collection")
-                or train_report.get("train_top1_single", 0.0)
-            )
-            gap_pp = 100.0 * (train_top1 - val_report["top1"])
-            if val_report["top1"] > self._best_val_top1:
-                if gap_pp > self.cfg.overfit_gap_pp_threshold:
-                    self.logger.warning(
-                        f"epoch {epoch}: train-val gap = {gap_pp:.1f} pp exceeds "
-                        f"{self.cfg.overfit_gap_pp_threshold:.1f} pp threshold, still saving"
-                    )
-                self._best_val_top1 = val_report["top1"]
-                self._best_epoch = epoch
-                self._best_state = {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
-                self._save_checkpoint("checkpoint_best.pt", epoch=epoch, val_top1=val_report["top1"])
+                # Best-checkpoint with overfit-gap guard.
+                train_top1 = (
+                    train_report.get("train_top1_mv_collection")
+                    or train_report.get("train_top1_single", 0.0)
+                )
+                gap_pp = 100.0 * (train_top1 - val_report["top1"])
+                if val_report["top1"] > self._best_val_top1:
+                    if gap_pp > self.cfg.overfit_gap_pp_threshold:
+                        self.logger.warning(
+                            f"epoch {epoch}: train-val gap = {gap_pp:.1f} pp exceeds "
+                            f"{self.cfg.overfit_gap_pp_threshold:.1f} pp threshold, still saving"
+                        )
+                    self._best_val_top1 = val_report["top1"]
+                    self._best_epoch = epoch
+                    self._best_state = {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
+                    self._save_checkpoint("checkpoint_best.pt", epoch=epoch, val_top1=val_report["top1"])
 
         elapsed = time.time() - t_start
 
