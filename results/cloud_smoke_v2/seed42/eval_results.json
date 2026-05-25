@@ -1,0 +1,9 @@
+{
+  "test_top1": 0.951028048992157,
+  "test_top5": 0.9845624566078186,
+  "single_view_top1": 0.5458201766014099,
+  "n_views": 4,
+  "epochs_trained": 5,
+  "seed": 42,
+  "note": "TASK B per-image full-test skipped due to state_dict bug; main eval only"
+}
