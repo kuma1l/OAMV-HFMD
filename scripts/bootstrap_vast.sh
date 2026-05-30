@@ -1,54 +1,61 @@
 #!/usr/bin/env bash
-# bootstrap_vast.sh — set up a fresh Vast.ai pytorch instance for E1.
+# bootstrap_vast.sh — set up a fresh Vast.ai instance for E1 on the UPSTREAM split.
+#
+# This is the author-provided canonical Hotels-8k split (delivered by Sam Black
+# 2026-05-29), staged as a single tarball on S3. It is the paper's real data +
+# label space and is now the PRIMARY split (PLAN.md §3.3). The old Kaggle/Stream-3
+# flow is preserved at scripts/bootstrap_vast_kaggle.sh for the appendix repro.
 #
 # Usage:
 #     # From the repo root after `git clone`:
 #     bash scripts/bootstrap_vast.sh
 #
-# Prerequisites — at least one of:
-#   (a) export KAGGLE_API_TOKEN=KGAT_...
-#   (b) ~/.kaggle/access_token  containing the KGAT_... token
-#   (c) ~/.kaggle/kaggle.json   (old format: {"username":"...","key":"..."})
+# No Kaggle credentials needed — the dataset is pulled from a public S3 object.
+# Override the source if you re-host it:  DATA_URL=https://... bash scripts/bootstrap_vast.sh
 #
 # Idempotent — safe to re-run; stages skip if their output already exists.
-# Total walltime on 1x A100 with fast Kaggle download: ~10-20 min.
+# Dataset is ~1.6 GB; total bootstrap walltime on a fresh instance: ~5-10 min.
+# Any 24 GB+ GPU (RTX 3090/4090, A5000/A6000, A100) runs E1 at batch 64.
 
 set -euo pipefail
 
 # --- Config ----------------------------------------------------------------
+DATA_URL="${DATA_URL:-https://mvfmd.s3.us-east-2.amazonaws.com/hotel_8k_images.tar}"
 WORKSPACE="${WORKSPACE:-/workspace}"
-RAW_DIR="${RAW_DIR:-${WORKSPACE}/raw_kaggle}"
-DATA_DIR="${DATA_DIR:-${WORKSPACE}/mvhfmd_data}"
-KAGGLE_COMP="${KAGGLE_COMP:-hotel-id-2021-fgvc8}"
+TAR_PATH="${TAR_PATH:-${WORKSPACE}/hotel_8k_images.tar}"
 
-# Expected split counts from PLAN.md §3.2 (md5-seeded; deterministic)
-EXPECTED_TRAIN=74281
-EXPECTED_VAL=10151
-EXPECTED_TEST=13091
-
-# Repo dir = parent of this script's dir
+# Repo dir = parent of this script's dir. The training config's data_dir is the
+# repo-relative "hotel_8k_images", so the dataset must extract to REPO_DIR.
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DATA_DIR="${REPO_DIR}/hotel_8k_images"
+
+# Expected counts for the upstream split (from the delivered .npy files).
+EXPECTED_TRAIN=91513
+EXPECTED_VAL=8000
+EXPECTED_TEST=12026
+EXPECTED_CLASSES=7774
 
 # --- Helpers ---------------------------------------------------------------
 banner() { printf '\n%s\n  %s\n%s\n' "============================================================" "$1" "============================================================"; }
 die()    { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 # --- Stage 1: env sanity ---------------------------------------------------
-banner "1/8  Env sanity"
+banner "1/6  Env sanity"
 python --version
 python -c "import torch; print('torch:', torch.__version__, '| cuda:', torch.cuda.is_available())"
 command -v nvidia-smi >/dev/null || die "nvidia-smi not found — is this a GPU instance?"
 nvidia-smi | head -20
-command -v unzip >/dev/null || { echo "Installing unzip..."; apt-get install -y -qq unzip; }
+command -v curl >/dev/null || { echo "Installing curl..."; apt-get update -qq && apt-get install -y -qq curl; }
+command -v tar  >/dev/null || die "tar not found — unexpected on an Ubuntu image."
 
 # --- Stage 2: pip install --------------------------------------------------
-banner "2/8  Installing Python dependencies"
+banner "2/6  Installing Python dependencies"
 pip install --quiet --upgrade pip
 pip install --quiet -r "${REPO_DIR}/requirements.txt"
 echo "OK"
 
 # --- Stage 3: verify critical pins -----------------------------------------
-banner "3/8  Verifying critical pins"
+banner "3/6  Verifying critical pins"
 python - <<'PYEOF'
 import timm, torch, sys
 errs = []
@@ -63,78 +70,56 @@ print(f"  timm:  {timm.__version__}")
 print(f"  torch: {torch.__version__}")
 PYEOF
 
-# --- Stage 4: kaggle creds check -------------------------------------------
-banner "4/8  Verifying Kaggle credentials"
-if [[ -z "${KAGGLE_API_TOKEN:-}" ]] && [[ ! -f "${HOME}/.kaggle/access_token" ]] && [[ ! -f "${HOME}/.kaggle/kaggle.json" ]]; then
-  die "No Kaggle credentials found. See header of this script for setup options."
-fi
-kaggle competitions list --search hotel-id-2021 | head -3 \
-  || die "Kaggle API call failed — check token validity, expiry, and rules-accepted status."
-
-# --- Stage 5: download from Kaggle -----------------------------------------
-banner "5/8  Downloading Hotels-8k from Kaggle (~24 GB)"
-mkdir -p "${RAW_DIR}"
-cd "${RAW_DIR}"
-if [[ -f "${KAGGLE_COMP}.zip" ]]; then
-  echo "  zip already present at ${RAW_DIR}/${KAGGLE_COMP}.zip, skipping download"
+# --- Stage 4: download dataset tarball from S3 -----------------------------
+banner "4/6  Downloading dataset (~1.6 GB) from ${DATA_URL}"
+if [[ -f "${DATA_DIR}/train.npy" ]]; then
+  echo "  ${DATA_DIR}/train.npy already present — dataset extracted, skipping download"
+elif [[ -f "${TAR_PATH}" ]]; then
+  echo "  tarball already at ${TAR_PATH}, skipping download"
 else
-  kaggle competitions download -c "${KAGGLE_COMP}"
-  ls -lh "${KAGGLE_COMP}.zip"
-fi
-
-# --- Stage 6: extract + free the zip immediately to save 24 GB -------------
-banner "6/8  Extracting (and removing zip after success to reclaim 24 GB)"
-if [[ -d "${RAW_DIR}/train_images" ]] && [[ -f "${RAW_DIR}/train.csv" ]]; then
-  echo "  already extracted, skipping"
-  [[ -f "${KAGGLE_COMP}.zip" ]] && { echo "  removing leftover zip..."; rm "${KAGGLE_COMP}.zip"; }
-else
-  # Pre-flight: need ~30 GB free for zip + extracted tree to coexist briefly.
-  free_kb=$(df -P "${RAW_DIR}" | awk 'NR==2 {print $4}')
+  free_kb=$(df -P "${WORKSPACE}" | awk 'NR==2 {print $4}')
   free_gb=$((free_kb / 1024 / 1024))
-  if [[ "${free_gb}" -lt 30 ]]; then
-    die "Only ${free_gb} GB free in ${RAW_DIR}; need ~30 GB headroom to extract safely. Free space or resize instance."
-  fi
-  unzip -q "${KAGGLE_COMP}.zip"
-  if [[ -d "${RAW_DIR}/train_images" ]] && [[ -f "${RAW_DIR}/train.csv" ]]; then
-    echo "  extraction OK, removing zip to reclaim 24 GB..."
-    rm "${KAGGLE_COMP}.zip"
-  else
-    die "Extraction completed but train_images/ or train.csv missing — not deleting zip. Investigate."
-  fi
+  [[ "${free_gb}" -lt 5 ]] && die "Only ${free_gb} GB free in ${WORKSPACE}; need ~5 GB for tar + extract."
+  # -f: fail loudly on HTTP 4xx/5xx (this is the link verification gate).
+  curl -fL --retry 3 --retry-delay 5 -o "${TAR_PATH}" "${DATA_URL}" \
+    || die "Download failed (bad URL, 403/404, or network). Check DATA_URL and S3 object ACL."
+  ls -lh "${TAR_PATH}"
 fi
-ls "${RAW_DIR}" | head -10
-df -h "${RAW_DIR}" | tail -1
 
-# --- Stage 7: per-hotel reorganization + splits ----------------------------
-banner "7/8  Reorganizing into per-hotel layout + building splits"
-if [[ -d "${DATA_DIR}" ]] && [[ "$(find "${DATA_DIR}" -maxdepth 1 -type d | wc -l)" -gt 1000 ]]; then
-  echo "  ${DATA_DIR} already populated, skipping reorganize"
+# --- Stage 5: extract ------------------------------------------------------
+banner "5/6  Extracting to ${DATA_DIR}"
+if [[ -f "${DATA_DIR}/train.npy" ]]; then
+  echo "  already extracted, skipping"
 else
-  python "${REPO_DIR}/scripts/reorganize_data.py" \
-      --csv      "${RAW_DIR}/train.csv" \
-      --src-root "${RAW_DIR}/train_images" \
-      --dst-root "${DATA_DIR}"
+  # Expect the tar to contain a top-level hotel_8k_images/ directory.
+  tar xf "${TAR_PATH}" -C "${REPO_DIR}"
+  [[ -f "${DATA_DIR}/train.npy" ]] || die "Extracted but ${DATA_DIR}/train.npy not found. The tarball layout may differ from the expected top-level hotel_8k_images/ folder — inspect with: tar tf ${TAR_PATH} | head"
+  echo "  extraction OK, removing tar to reclaim space..."
+  rm -f "${TAR_PATH}"
 fi
+ls "${DATA_DIR}" | head
 
-python "${REPO_DIR}/scripts/build_splits.py" --data-root "${DATA_DIR}"
-
-# --- Stage 8: verify split counts ------------------------------------------
-banner "8/8  Verifying split counts vs PLAN.md §3.2"
+# --- Stage 6: verify counts + label space ----------------------------------
+banner "6/6  Verifying upstream split counts + label space"
 python - <<PYEOF
 import numpy as np, sys
-data = "${DATA_DIR}"
-got = {s: int(len(np.load(f"{data}/{s}.npy"))) for s in ("train", "val", "test")}
+d = "${DATA_DIR}"
+got = {s: int(len(np.load(f"{d}/{s}.npy", allow_pickle=True))) for s in ("train","val","test")}
 exp = {"train": ${EXPECTED_TRAIN}, "val": ${EXPECTED_VAL}, "test": ${EXPECTED_TEST}}
-total_got = sum(got.values()); total_exp = sum(exp.values())
-print(f"          got      expected  diff")
-for s in ("train", "val", "test"):
-    print(f"  {s:6s} {got[s]:>7d}  {exp[s]:>7d}  {got[s]-exp[s]:+d}")
-# Strict equality is ideal but +/- 0.1% is acceptable (a few image files in
-# the Kaggle archive may differ from the snapshot used to compute PLAN's numbers).
-if abs(total_got - total_exp) / total_exp > 0.001:
-    print(f"FAIL: total off by {total_got-total_exp} (>0.1%) -- investigate before E1.")
-    sys.exit(1)
-print("OK (within tolerance).")
+print("          got      expected")
+ok = True
+for s in ("train","val","test"):
+    flag = "" if got[s]==exp[s] else "  <-- MISMATCH"
+    if got[s]!=exp[s]: ok = False
+    print(f"  {s:6s} {got[s]:>7d}  {exp[s]:>7d}{flag}")
+tr = np.load(f"{d}/train.npy", allow_pickle=True)
+nclass = len({p.split("/")[-2] for p in tr})
+flag = "" if nclass==${EXPECTED_CLASSES} else "  <-- MISMATCH"
+if nclass!=${EXPECTED_CLASSES}: ok = False
+print(f"  classes {nclass:>5d}  {${EXPECTED_CLASSES}:>7d}{flag}")
+if not ok:
+    print("FAIL: dataset does not match the expected upstream split — do not train."); sys.exit(1)
+print("OK — upstream split verified.")
 PYEOF
 
 # --- Done ------------------------------------------------------------------
@@ -143,14 +128,16 @@ cat <<MSG
 Data ready at:  ${DATA_DIR}
 Code ready at:  ${REPO_DIR}
 
-Next: time one epoch of E1 at A100 batch size 64 to validate compute budget.
+Next: time one epoch of E1 at batch 64 to validate the compute budget.
 
   cd ${REPO_DIR}
-  python scripts/01_train_mvhfmd_baseline.py \\
-      --config configs/E1_mvhfmd_baseline.yaml \\
-      --seed 42 --n-views 4 --epochs 1 --batch-size 64 \\
-      --out-dir results/cloud_smoke
+  python scripts/01_train_mvhfmd_baseline.py --config configs/E1_mvhfmd_upstream.yaml --seed 42 --n-views 4 --epochs 1 --batch-size 64 --out-dir results/cloud_smoke_upstream
 
-If first epoch takes ~10 min  -> PLAN budget honest, launch the full 50-epoch run.
-If first epoch takes >>30 min -> stop, debug; do not scale up on a stale estimate.
+If first epoch is sane, launch the full 50-epoch sweep (3 seeds x {single,2,4}) in tmux:
+
+  for S in 42 1337 2024; do for N in single 2 4; do
+    python scripts/01_train_mvhfmd_baseline.py --config configs/E1_mvhfmd_upstream.yaml --seed \$S --n-views \$N --batch-size 64 --num-workers 8
+  done; done
+
+Outputs land in results/E1_mvhfmd_upstream/{single,N2,N4}_seed{42,1337,2024}/.
 MSG

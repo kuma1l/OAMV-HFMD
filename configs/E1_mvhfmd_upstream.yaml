@@ -1,0 +1,23 @@
+# E1 (upstream split): MV-HFMD reproduction on the canonical author-provided
+# Hotels-8k split (train/val/test.npy + images delivered by Sam Black 2026-05-29,
+# staged at hotel_8k_images/). This is the paper's real data + label space; the
+# Stream 3 fallback split (E1_mvhfmd_baseline.yaml) drops to appendix.
+# Pass criterion: mean test_top1 within band of paper (46.3/65.1/~70 % single/N2/N4),
+# fusion delta (N2 - single) within tolerance. PLAN.md §3.3, §6.E1, §18 claim 1.
+inherits: base.yaml
+
+method: "mvhfmd_baseline_upstream"
+split_source: "upstream_author_split_2026-05-29"
+model:
+  variant: "baseline"                # MultiImageHybrid, static E_img, uniform L_md
+  num_classes: 7774                  # derived from upstream train.npy; matches paper's 7,774 hotels
+                                     # (NOTE: driver overrides this with ds_train.num_classes at runtime)
+
+paths:
+  data_dir: "hotel_8k_images"        # repo-internal; npy entries already carry train//test/ prefix
+  out_dir: "./results/E1_mvhfmd_upstream"
+
+# Sweep N over {single, 2, 4}. Driver iterates per (n_views, seed).
+sweep:
+  n_views: ["single", 2, 4]
+  seeds:   [42, 1337, 2024]

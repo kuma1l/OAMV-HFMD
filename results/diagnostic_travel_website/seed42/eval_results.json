@@ -1,0 +1,51 @@
+{
+  "n_hotels": 354,
+  "n_images": 3283,
+  "single_view_top1": 0.0,
+  "mv_N4_top1_micro": 0.0,
+  "mv_N4_top1_macro": 0.0,
+  "mv_N4_n_hotels": 354,
+  "mv_N4_n_samples": 61393,
+  "per_hotel_acc_deciles": [
+    354,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "per_hotel_cap_k": 10,
+  "per_hotel_cap_seed": 42,
+  "n_hotels_capped": 273,
+  "total_n4_combos": 61393,
+  "_meta": {
+    "split": "test_travel_website",
+    "checkpoint": "results\\E1_mvhfmd_baseline\\seed42\\checkpoint_best.pt",
+    "arch": "vit_small_r26_s32_224",
+    "num_classes": 7754,
+    "n_views": 4,
+    "seed": 42,
+    "device": "cuda",
+    "amp": true,
+    "elapsed_mv_extract_seconds": 2027.5130078792572,
+    "elapsed_single_view_seconds": 20.90132188796997,
+    "per_hotel_acc_decile_edges": [
+      0.0,
+      0.1,
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "n_hotels_with_4plus_views_in_split": 354
+  }
+}

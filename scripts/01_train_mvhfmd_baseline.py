@@ -148,7 +148,7 @@ def main():
         "amp": cfg["train"]["amp"],
         "label_smoothing": cfg["train"]["label_smoothing"],
         "ce_ignore_index": cfg["train"]["ce_ignore_index"],
-        "split_source": "fallback_stream3_md5_seed42",
+        "split_source": cfg.get("split_source", "fallback_stream3_md5_seed42"),
         "data_dir": data_dir,
         "git_commit": _git_commit(),
         "timm_version": timm.__version__,

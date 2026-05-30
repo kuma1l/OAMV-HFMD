@@ -15,6 +15,7 @@ venv/
 results/**/*.pt
 results/**/*.pth
 results/**/*.ckpt
+results/**/*.zip
 results/**/checkpoints/
 
 # Logs
@@ -36,6 +37,8 @@ results/**/train.log
 mvhfmd_data/
 hotels-8k/
 images/
+hotel_8k_images/
+*.tar
 
 # Paper build artifacts
 paper/*.aux
