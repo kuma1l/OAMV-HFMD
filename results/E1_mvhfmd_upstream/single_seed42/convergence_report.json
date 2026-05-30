@@ -1,0 +1,28 @@
+{
+  "status": "OVERFIT",
+  "diagnosis": "train-val gap = 33.6 pp > 20 pp",
+  "epochs_completed": 50,
+  "effective_epochs": 50.0,
+  "initial_loss": 8.9609375,
+  "final_loss": 0.08316704564096107,
+  "loss_reduction_frac": 0.9907189347497446,
+  "val_top1_trajectory": [
+    0.0,
+    0.370125,
+    0.515375,
+    0.539875,
+    0.53625,
+    0.551375,
+    0.581625,
+    0.60325,
+    0.635625,
+    0.657125,
+    0.664125
+  ],
+  "val_top1_delta_last_3_epochs_pp": 2.849999999999997,
+  "final_train_val_gap_pp": 33.55799599510453,
+  "max_train_val_gap_pp": 33.55799599510453,
+  "best_qualifying_ckpt_epoch": 50,
+  "best_val_top1": 0.664125,
+  "elapsed_train_seconds": 9640.46464419365
+}
