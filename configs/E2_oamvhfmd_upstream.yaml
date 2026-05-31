@@ -1,0 +1,26 @@
+# E2 (upstream split): OAMV-HFMD *combined* method on the canonical author-provided
+# Hotels-8k split. Decisive A/B vs configs/E1_mvhfmd_upstream.yaml (same data,
+# same loaders, same N=4): isolates the mechanism (overlap embed + overlap-weighted
+# symmetric KL) vs the MV-HFMD baseline (static E_img + uniform L_md).
+# Headline number: results/E2_oamvhfmd_upstream/N4_seed42/eval_results.json -> test_top1.
+# PLAN.md §6.E2, §18 claim 5.
+inherits: base.yaml
+
+method: "oamvhfmd_combined_upstream"
+split_source: "upstream_author_split_2026-05-29"
+model:
+  variant: "overlap_aware"             # OverlapAwareHybrid, MLP(S) embed, overlap-weighted L_md
+  num_classes: 7774                    # upstream train.npy class count; driver overrides with ds_train.num_classes
+  enable_overlap_embed: true
+
+oracle:
+  kind: "dinov2_s"
+  mlp_hidden: 64
+
+paths:
+  data_dir: "hotel_8k_images"
+  out_dir: "./results/E2_oamvhfmd_upstream"
+
+sweep:
+  n_views: [4]
+  seeds:   [42]
