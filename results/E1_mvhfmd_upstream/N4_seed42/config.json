@@ -7,7 +7,7 @@
   "lr": 0.01,
   "weight_decay": 0.0005,
   "momentum": 0.9,
-  "batch_size": 64,
+  "batch_size": 40,
   "val_batch_size": 128,
   "lambda_md": 0.1,
   "md_temp": 4.0,
@@ -18,7 +18,7 @@
   "ce_ignore_index": -1,
   "split_source": "upstream_author_split_2026-05-29",
   "data_dir": "hotel_8k_images",
-  "git_commit": "8695b0370efebedc334156e487c8169cd72387ca",
+  "git_commit": "a060c09f5176c318a2b29c0391816b9d003d4e4d",
   "timm_version": "0.9.10",
   "torch_version": "2.6.0+cu124",
   "num_classes": 7774

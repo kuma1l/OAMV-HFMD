@@ -1,0 +1,28 @@
+{
+  "status": "UNDERTRAINED",
+  "diagnosis": "val_top1 still improving in last 3 epochs (> 0.5 pp delta)",
+  "epochs_completed": 50,
+  "effective_epochs": 50.0,
+  "initial_loss": 17.921875,
+  "final_loss": 0.1052303093850248,
+  "loss_reduction_frac": 0.9941283872705827,
+  "val_top1_trajectory": [
+    0.0,
+    0.6605,
+    0.7464166666666666,
+    0.7535,
+    0.7555833333333334,
+    0.7581666666666667,
+    0.7906666666666666,
+    0.8081666666666667,
+    0.8205833333333333,
+    0.8346666666666667,
+    0.8376666666666667
+  ],
+  "val_top1_delta_last_3_epochs_pp": 1.708333333333334,
+  "final_train_val_gap_pp": 16.233333333333334,
+  "max_train_val_gap_pp": 16.233333333333334,
+  "best_qualifying_ckpt_epoch": 50,
+  "best_val_top1": 0.8376666666666667,
+  "elapsed_train_seconds": 16776.773195266724
+}
