@@ -37,12 +37,16 @@ def main():
         cfg = json.loads((run / "config.json").read_text()) if (run / "config.json").exists() else {}
         ev  = json.loads((run / "eval_results.json").read_text()) if (run / "eval_results.json").exists() else {}
         cv  = json.loads((run / "convergence_report.json").read_text()) if (run / "convergence_report.json").exists() else {}
+        ci = ev.get("test_top1_ci_hotelcluster") or {}
         rows.append({
             "run": run.name,
             "n_views": cfg.get("n_views"),
             "seed":    cfg.get("seed"),
+            "tau_overlap": cfg.get("tau_overlap"),
             "test_top1": ev.get("test_top1"),
             "test_top5": ev.get("test_top5"),
+            "test_top1_ci_lo_hotelcluster": ci.get("lo"),
+            "test_top1_ci_hi_hotelcluster": ci.get("hi"),
             "convergence_status": cv.get("status"),
         })
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)

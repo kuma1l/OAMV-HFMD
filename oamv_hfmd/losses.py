@@ -79,6 +79,7 @@ def overlap_md_loss(
     tau_overlap: float = 4.0,
     tau_kl: float = 4.0,
     lambda_hyperparam: float = 0.1,
+    overlap_sign: float = 1.0,
 ) -> torch.Tensor:
     """Overlap-weighted symmetric mutual distillation. PLAN.md §1.4 C3.
 
@@ -98,11 +99,14 @@ def overlap_md_loss(
         tau_overlap: temperature for the softmax over S rows.
         tau_kl: KL temperature (matches md_temp in upstream).
         lambda_hyperparam: loss weight (matches md_lambda in upstream).
+        overlap_sign: +1 up-weights views SIMILAR to i in the teacher (original
+            form); -1 up-weights COMPLEMENTARY (dissimilar) views — the
+            motivation-aligned direction (PLAN §4.3, pre-flight 2026-06-01).
 
     Returns:
         scalar loss already scaled by tau_kl**2 * lambda — add directly to total loss.
     """
-    weights = torch.softmax(S / tau_overlap, dim=-1)   # (B, N, N)
+    weights = torch.softmax(overlap_sign * S / tau_overlap, dim=-1)   # (B, N, N)
     z_bar = torch.bmm(weights, z_single)                # (B, N, K)
     B, N, _ = z_bar.shape
 

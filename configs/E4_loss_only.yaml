@@ -5,7 +5,8 @@ method: "oamvhfmd_loss_only"
 model:
   variant: "overlap_aware"
   enable_overlap_embed: false        # keep static E_img
-  enable_overlap_md_loss: true
+# Loss function is selected by the driver from `method`/`variant`; there is no
+# enable_overlap_md_loss flag in the code path.
 
 paths:
   out_dir: "./results/E4_loss_only"

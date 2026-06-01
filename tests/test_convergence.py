@@ -7,7 +7,7 @@ def _report(**kwargs) -> dict:
         "effective_epochs": 100,
         "loss_reduction_frac": 0.5,
         "final_train_val_gap_pp": 5.0,
-        "val_top1_delta_last_3_epochs_pp": 0.1,
+        "val_top1_delta_last_3_val_points_pp": 0.1,
     }
     base.update(kwargs)
     return base
@@ -34,5 +34,5 @@ def test_overfit_large_gap():
 
 
 def test_undertrained_val_still_improving():
-    status, _ = classify(_report(val_top1_delta_last_3_epochs_pp=1.0))
+    status, _ = classify(_report(val_top1_delta_last_3_val_points_pp=1.0))
     assert status == "UNDERTRAINED"

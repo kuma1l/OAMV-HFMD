@@ -62,6 +62,7 @@ class TrainConfig:
 
     # Overlap-weighted distillation (our method only)
     tau_overlap:      float = 4.0
+    overlap_sign:     float = 1.0   # +1 up-weight similar; -1 up-weight complementary
 
     # Convergence pipeline (PLAN.md §5.5)
     overfit_gap_pp_threshold: float = 30.0  # best-ckpt guard
@@ -196,6 +197,7 @@ class Trainer:
                             tau_overlap=self.cfg.tau_overlap,
                             tau_kl=self.cfg.md_temp,
                             lambda_hyperparam=self.cfg.lambda_md,
+                            overlap_sign=self.cfg.overlap_sign,
                         )
                     else:
                         md = self.md_loss_fn(
@@ -398,21 +400,33 @@ class Trainer:
             final_train_val_gap_pp = 100.0 * (
                 self._train_top1_trajectory[-1] - self._val_top1_trajectory[-1]
             )
+        # Val cadence is every 5 epochs (Trainer.fit), so the last 3 val
+        # points span ~10 training epochs — the field name reflects that.
         val_delta_last3_pp = 0.0
         if len(self._val_top1_trajectory) >= 4:
             recent = self._val_top1_trajectory[-3:]
             val_delta_last3_pp = 100.0 * (max(recent) - min(recent))
 
+        # Honest effective_epochs: total samples seen / training-set size.
+        # (Was previously hardcoded to cfg.epochs, making the "≥5 effective
+        #  epochs" gate inert.)
+        train_set_size = max(1, len(self.train_loader.dataset))
+        steps_per_epoch = max(1, len(self.train_loader))
+        effective_epochs = (
+            self.cfg.epochs * steps_per_epoch * self.cfg.batch_size
+            / train_set_size
+        )
+
         conv_report = {
             "status": "UNDERTRAINED",
             "diagnosis": "",
             "epochs_completed": self.cfg.epochs,
-            "effective_epochs": float(self.cfg.epochs),
+            "effective_epochs": float(effective_epochs),
             "initial_loss": init_loss,
             "final_loss": final_loss,
             "loss_reduction_frac": loss_reduction_frac,
             "val_top1_trajectory": self._val_top1_trajectory,
-            "val_top1_delta_last_3_epochs_pp": val_delta_last3_pp,
+            "val_top1_delta_last_3_val_points_pp": val_delta_last3_pp,
             "final_train_val_gap_pp": final_train_val_gap_pp,
             "max_train_val_gap_pp": final_train_val_gap_pp,
             "best_qualifying_ckpt_epoch": self._best_epoch,

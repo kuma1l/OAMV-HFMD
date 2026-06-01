@@ -29,7 +29,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from oamv_hfmd.data import HotelsDataset
-from oamv_hfmd.eval import Evaluator
+from oamv_hfmd.eval import Evaluator, cluster_bootstrap_ci
 from oamv_hfmd.losses import overlap_md_loss
 from oamv_hfmd.model import OverlapAwareHybrid
 from oamv_hfmd.trainer import TrainConfig, Trainer
@@ -53,6 +53,14 @@ def parse_args() -> argparse.Namespace:
                         "expect higher VRAM than baseline at same batch size.")
     p.add_argument("--num-workers", type=int, default=None,
                    help="Override num_workers (CPU loaders). Lower on Windows.")
+    p.add_argument("--tau-overlap", type=float, default=None,
+                   help="Override loss.tau_overlap from config. Corrected sweep is "
+                        "{0.25, 0.5, 1.0}; values >= 2.0 nearly nullify the overlap "
+                        "weighting (AUDIT H-1 / PLAN §4.3).")
+    p.add_argument("--overlap-sign", type=float, default=None,
+                   help="Override loss.overlap_sign. +1 up-weights views SIMILAR to i "
+                        "in the distillation teacher (original); -1 up-weights "
+                        "COMPLEMENTARY views (motivation-aligned, pre-flight 2026-06-01).")
     p.add_argument("--out-dir", type=str, default=None,
                    help="Override paths.out_dir from config.")
     p.add_argument("--dry-run", action="store_true",
@@ -123,6 +131,12 @@ def main():
     n_views = _resolve_n_views(args.n_views, cfg)
     epochs = args.epochs if args.epochs is not None else cfg["train"]["epochs"]
     batch_size = args.batch_size if args.batch_size is not None else cfg["train"]["batch_size"]
+    if args.tau_overlap is not None:
+        cfg["loss"]["tau_overlap"] = float(args.tau_overlap)
+    tau_overlap_effective = float(cfg["loss"].get("tau_overlap", 4.0))
+    if args.overlap_sign is not None:
+        cfg["loss"]["overlap_sign"] = float(args.overlap_sign)
+    overlap_sign_effective = float(cfg["loss"].get("overlap_sign", 1.0))
     val_batch_size = cfg["train"].get("val_batch_size", 128)
     num_workers = args.num_workers if args.num_workers is not None else cfg["train"]["num_workers"]
     dl_extras = dict(persistent_workers=True, prefetch_factor=4) if num_workers > 0 else {}
@@ -137,6 +151,17 @@ def main():
     logger = get_logger(f"02_oamvhfmd.{out_dir.name}", out_dir / "train.log")
     logger.info(f"config={args.config} variant={args.variant} seed={args.seed} "
                 f"n_views={n_views} epochs={epochs} batch_size={batch_size} out_dir={out_dir}")
+    # Loud guard: tau_overlap >= 2.0 makes softmax over cosine sims ~uniform,
+    # nullifying the overlap weighting (AUDIT H-1 / PLAN §4.3). Refuse to start.
+    logger.info(f"OAMV tau_overlap (effective) = {tau_overlap_effective}  "
+                f"overlap_sign (effective) = {overlap_sign_effective}")
+    if tau_overlap_effective >= 2.0:
+        raise SystemExit(
+            f"ABORT: tau_overlap={tau_overlap_effective} >= 2.0 nearly nullifies the "
+            "overlap weighting (cosine sims live in ~[0.3, 1.0]; softmax / tau collapses "
+            "to ~uniform). This is exactly the bug that invalidated the prior E2 run. "
+            "Set --tau-overlap to one of {0.25, 0.5, 1.0} or update the YAML."
+        )
 
     # --- snapshot config.json
     data_dir = cfg["paths"]["data_dir"]
@@ -158,6 +183,7 @@ def main():
         "lambda_md": cfg["loss"]["lambda_md"],
         "md_temp": cfg["loss"]["md_temp"],
         "tau_overlap": cfg["loss"].get("tau_overlap", 4.0),
+        "overlap_sign": cfg["loss"].get("overlap_sign", 1.0),
         "oracle_kind": oracle_kind,
         "mlp_hidden": mlp_hidden,
         "grad_clip": cfg["train"]["grad_clip"],
@@ -239,6 +265,7 @@ def main():
         lambda_md=cfg["loss"]["lambda_md"],
         md_temp=cfg["loss"]["md_temp"],
         tau_overlap=cfg["loss"].get("tau_overlap", 4.0),
+        overlap_sign=cfg["loss"].get("overlap_sign", 1.0),
     )
 
     # Trainer auto-routes via output["similarity"] — pass overlap_md_loss directly.
@@ -269,7 +296,10 @@ def main():
     score_dict = evaluator.evaluate(test_loader)
     for view_type, metrics in score_dict.items():
         for metric, value in metrics.items():
-            logger.info(f"test {view_type} {metric}: {value:.6f}")
+            # Skip non-scalar entries (per_combo_correct / per_combo_hotel_ids
+            # arrays added for the cluster bootstrap); only scalars format with .6f.
+            if isinstance(value, (int, float)):
+                logger.info(f"test {view_type} {metric}: {value:.6f}")
 
     # --- flatten score_dict -> eval_results.json
     # NOTE: per-image full-test single-view eval (the n=1 second pass that script
@@ -280,14 +310,22 @@ def main():
         test_top1 = float(score_dict["mv_collection"]["top1_acc"])
         test_top5 = float(score_dict["mv_collection"]["top5_acc"])
         single_view_top1 = float(score_dict["single"]["top1_acc"])
+        # Hotel-level cluster bootstrap CI (PLAN §8 / AUDIT H-3).
+        ci_hotel = cluster_bootstrap_ci(
+            score_dict["mv_collection"]["per_combo_correct"],
+            score_dict["mv_collection"]["per_combo_hotel_ids"],
+            n_boot=1000, seed=0,
+        )
     else:
         test_top1 = float(score_dict["single"]["top1_acc"])
         test_top5 = float(score_dict["single"]["top5_acc"])
         single_view_top1 = test_top1
+        ci_hotel = None
 
     eval_results = {
         "test_top1": test_top1,
         "test_top5": test_top5,
+        "test_top1_ci_hotelcluster": ci_hotel,
         "single_view_top1": single_view_top1,
         "single_view_per_image_top1_full_test": None,  # see note above
         "single_view_per_image_n_evaluated": 0,
@@ -299,7 +337,8 @@ def main():
         "best_val_top1": float(conv_report.get("best_val_top1", 0.0)),
         "elapsed_train_seconds": float(elapsed_train),
         "per_view_metrics": {
-            vt: {k: float(v) for k, v in metrics.items()}
+            vt: {k: float(v) for k, v in metrics.items()
+                 if k not in ("per_combo_correct", "per_combo_hotel_ids")}
             for vt, metrics in score_dict.items()
         },
     }

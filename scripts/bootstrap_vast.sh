@@ -155,10 +155,13 @@ A) Sanity-check the OAMV wiring (no training):
    python scripts/02_train_oamvhfmd.py --config configs/E2_oamvhfmd_upstream.yaml \\
        --seed 42 --n-views 4 --num-workers 8 --dry-run
 
-B) Decisive A/B — OAMV combined N=4 vs baseline N=4 (68.89%):
-   nohup python scripts/02_train_oamvhfmd.py --config configs/E2_oamvhfmd_upstream.yaml \\
-       --seed 42 --n-views 4 --batch-size 40 --num-workers 8 > oamv_n4.log 2>&1 &
-   tail -f oamv_n4.log
+B) Decisive A/B — corrected OAMV combined N=4 vs baseline N=4 (68.89%):
+   #   tau_overlap=0.5 (mechanism ACTIVE; verified non-inert in the pre-flight),
+   #   overlap_sign=-1 (up-weight COMPLEMENTARY views), sorted MLP(S) embedding.
+   nohup python scripts/02_train_oamvhfmd.py --config configs/E2_oamvhfmd_commit.yaml \\
+       --seed 42 --n-views 4 --batch-size 40 --num-workers 8 > oamv_commit.log 2>&1 &
+   tail -f oamv_commit.log
 
-Result -> results/E2_oamvhfmd_upstream/N4_seed42/eval_results.json  (compare test_top1 to 0.6889).
+Result -> results/E2_oamvhfmd_commit/N4_seed42/eval_results.json
+   compare test_top1 (and test_top1_ci_hotelcluster) to baseline 0.6889.
 MSG

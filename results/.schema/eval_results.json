@@ -1,13 +1,38 @@
 {
-  "_schema_doc": "Final eval metrics. Written by the driver script after training.",
+  "_schema_doc": "Final eval metrics. Written by the driver script after training. Reflects what scripts/01_train_mvhfmd_baseline.py and scripts/02_train_oamvhfmd.py emit as of PLAN v1.5.",
   "test_top1": 0.0,
   "test_top5": 0.0,
+  "test_top1_ci_hotelcluster": {
+    "mean": 0.0,
+    "lo": 0.0,
+    "hi": 0.0,
+    "n_boot": 1000
+  },
   "single_view_top1": 0.0,
-  "n_test_hotels": 7754,
+  "single_view_per_image_top1_full_test": 0.0,
+  "single_view_per_image_n_evaluated": 0,
+  "n_test_hotels": 7774,
   "n_test_samples": 0,
   "n_views": 4,
   "eval_mode": "exhaustive_combinations",
   "best_checkpoint_epoch": 0,
   "best_val_top1": 0.0,
-  "elapsed_train_seconds": 0
+  "elapsed_train_seconds": 0,
+  "elapsed_per_image_eval_seconds": 0,
+  "per_view_metrics": {
+    "single": {
+      "top1_acc": 0.0,
+      "top2_acc": 0.0,
+      "top5_acc": 0.0,
+      "top10_acc": 0.0,
+      "top100_acc": 0.0
+    },
+    "mv_collection": {
+      "top1_acc": 0.0,
+      "top2_acc": 0.0,
+      "top5_acc": 0.0,
+      "top10_acc": 0.0,
+      "top100_acc": 0.0
+    }
+  }
 }

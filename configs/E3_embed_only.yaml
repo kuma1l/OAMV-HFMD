@@ -5,7 +5,8 @@ method: "oamvhfmd_embed_only"
 model:
   variant: "overlap_aware"
   enable_overlap_embed: true
-  enable_overlap_md_loss: false      # keep MV-HFMD's uniform L_md
+# Loss is selected by the driver from method/variant (no enable_overlap_md_loss flag in code).
+# For E3 (embed-only), use --variant embed_only on script 02; the driver will use baseline_md_loss.
 
 paths:
   out_dir: "./results/E3_embed_only"

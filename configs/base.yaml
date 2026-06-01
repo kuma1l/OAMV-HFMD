@@ -13,7 +13,7 @@ paths:
 model:
   arch:            "vit_small_r26_s32_224"   # PLAN.md §4.1; locked by Sanity Stream 4
   pretrained:      true
-  num_classes:     7754                       # Stream 3 fallback split's class count
+  num_classes:     7774                       # upstream author split's class count (driver overrides from dataset)
   n_views:         4                          # main.py default is 2; we set 4 as our common choice
 
 # Oracle (used by OverlapAwareHybrid; ignored by MV-HFMD baseline)
@@ -34,7 +34,7 @@ train:
     pct_start_epochs:  5                      # main.py uses pct_start = 5 / num_epochs (5 warmup epochs)
     anneal_strategy:   "cos"
   epochs:          50                         # main.py default
-  batch_size:      64                         # main.py train batch
+  batch_size:      40                         # VRAM-constrained value used in all real runs (24 GB cards). Upstream main.py default 64 is untested here.
   val_batch_size:  128                        # main.py val/test batch
   grad_clip:       80.0                       # main.py default (large because no label smoothing)
   label_smoothing: 0.0                        # NONE — main.py uses nn.CrossEntropyLoss(ignore_index=-1)
@@ -48,7 +48,8 @@ loss:
   ce_mv_weight:     1.0
   lambda_md:        0.1                       # main.py md_lambda default
   md_temp:          4.0                       # main.py md_temp default
-  tau_overlap:      4.0                       # softmax temperature on S rows (our overlap weighting)
+  tau_overlap:      0.5                       # softmax temperature on S rows. Corrected v1.5 default: 4.0 nearly nullifies overlap weighting on cosine sims in ~[0.3, 1.0] (AUDIT H-1 / PLAN §4.3). Sweep: {0.25, 0.5, 1.0} via --tau-overlap on the driver.
+  overlap_sign:     1.0                       # +1 up-weight views SIMILAR to i in the teacher (original); -1 up-weight COMPLEMENTARY views (motivation-aligned, pre-flight 2026-06-01). Override via --overlap-sign.
 
 # Seeds — three production seeds. PLAN.md §5.4.
 seeds: [42, 1337, 2024]

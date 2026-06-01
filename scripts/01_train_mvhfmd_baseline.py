@@ -29,7 +29,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from oamv_hfmd.data import HotelsDataset
-from oamv_hfmd.eval import Evaluator
+from oamv_hfmd.eval import Evaluator, cluster_bootstrap_ci
 from oamv_hfmd.losses import baseline_md_loss
 from oamv_hfmd.model import MultiImageHybrid
 from oamv_hfmd.trainer import TrainConfig, Trainer
@@ -244,7 +244,10 @@ def main():
     score_dict = evaluator.evaluate(test_loader)
     for view_type, metrics in score_dict.items():
         for metric, value in metrics.items():
-            logger.info(f"test {view_type} {metric}: {value:.6f}")
+            # Skip non-scalar entries (per_combo_correct / per_combo_hotel_ids
+            # arrays added for the cluster bootstrap); only scalars format with .6f.
+            if isinstance(value, (int, float)):
+                logger.info(f"test {view_type} {metric}: {value:.6f}")
 
     # --- per-image full-test single-view eval (no combo expansion).
     # The exhaustive eval above only covers C(M, N)-eligible hotels (e.g. for
@@ -293,15 +296,25 @@ def main():
         test_top1 = float(score_dict["mv_collection"]["top1_acc"])
         test_top5 = float(score_dict["mv_collection"]["top5_acc"])
         single_view_top1 = float(score_dict["single"]["top1_acc"])
+        # Hotel-level cluster bootstrap CI over mv_collection per-combo top-1
+        # (PLAN §8 / AUDIT H-3). Combos within a hotel are correlated, so a
+        # combo-level bootstrap would underestimate variance.
+        ci_hotel = cluster_bootstrap_ci(
+            score_dict["mv_collection"]["per_combo_correct"],
+            score_dict["mv_collection"]["per_combo_hotel_ids"],
+            n_boot=1000, seed=0,
+        )
     else:
         # n=1 case
         test_top1 = float(score_dict["single"]["top1_acc"])
         test_top5 = float(score_dict["single"]["top5_acc"])
         single_view_top1 = test_top1
+        ci_hotel = None
 
     eval_results = {
         "test_top1": test_top1,
         "test_top5": test_top5,
+        "test_top1_ci_hotelcluster": ci_hotel,
         "single_view_top1": single_view_top1,
         "single_view_per_image_top1_full_test": float(per_image_top1),
         "single_view_per_image_n_evaluated": int(pi_total),
@@ -314,7 +327,8 @@ def main():
         "elapsed_train_seconds": float(elapsed_train),
         "elapsed_per_image_eval_seconds": float(elapsed_per_image),
         "per_view_metrics": {
-            vt: {k: float(v) for k, v in metrics.items()}
+            vt: {k: float(v) for k, v in metrics.items()
+                 if k not in ("per_combo_correct", "per_combo_hotel_ids")}
             for vt, metrics in score_dict.items()
         },
     }

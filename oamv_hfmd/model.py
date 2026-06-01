@@ -164,8 +164,11 @@ class OverlapAwareHybrid(MultiImageHybrid):
         self.oracle_kind = oracle_kind
         self.enable_overlap_embed = enable_overlap_embed
 
-        # Freeze the static embedding — we replace it with MLP(S) when enabled.
-        self.img_embed_matrix.requires_grad_(False)
+        # Freeze the static embedding only when the MLP replaces it. In the
+        # loss-only path (enable_overlap_embed=False) the parent's static
+        # img_embed_matrix is still used and must remain trainable.
+        if enable_overlap_embed:
+            self.img_embed_matrix.requires_grad_(False)
 
         self.oracle = build_oracle(oracle_kind)
         self.overlap_mlp = nn.Sequential(
@@ -204,7 +207,15 @@ class OverlapAwareHybrid(MultiImageHybrid):
                 x = torch.cat((x[:, :excess], x[:, excess + 1:]), dim=1)
             first_img_token_idx = 1
 
-        emb = self.overlap_mlp(S)  # (B, N, embed_dim)
+        # Sort each row of S descending before the MLP so the input is
+        # invariant to the (random) within-collection view ordering. The
+        # columns of S[i, :] otherwise carry no consistent meaning across
+        # samples, and Linear(N → h) has no mechanism to learn that
+        # invariance from finite data. After sort, column 0 is the
+        # self-similarity (= 1.0 after L2-norm); off-diagonal entries are
+        # ranked by magnitude. PLAN §4.2 / option D-1(a).
+        S_sorted, _ = torch.sort(S, dim=-1, descending=True)
+        emb = self.overlap_mlp(S_sorted)  # (B, N, embed_dim)
         emb = F.normalize(emb, dim=-1)
         x[:, first_img_token_idx:] += torch.repeat_interleave(emb, tokens_per_image, dim=1)
         return x

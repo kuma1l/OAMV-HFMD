@@ -24,6 +24,8 @@ def classify(report: dict) -> tuple[str, str]:
         return "UNDERTRAINED", "loss reduced by < 20% — model barely learning"
     if report["final_train_val_gap_pp"] > 20:
         return "OVERFIT", f"train-val gap = {report['final_train_val_gap_pp']:.1f} pp > 20 pp"
-    if report.get("val_top1_delta_last_3_epochs_pp", 0.0) > 0.5:
-        return "UNDERTRAINED", "val_top1 still improving in last 3 epochs (> 0.5 pp delta)"
+    # Field is named "val_points" because validation runs every 5 epochs in
+    # Trainer.fit, so the last 3 val points span ~10 training epochs, not 3.
+    if report.get("val_top1_delta_last_3_val_points_pp", 0.0) > 0.5:
+        return "UNDERTRAINED", "val_top1 still improving in last 3 val points (> 0.5 pp delta)"
     return "CONVERGED", "all four §5.5 criteria satisfied"

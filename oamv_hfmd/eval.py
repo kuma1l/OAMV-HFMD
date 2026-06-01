@@ -146,7 +146,62 @@ class Evaluator:
             gt = torch.from_numpy(np.expand_dims(results[view_type]["classes"], -1)).to(self.eval_device)
             logits = results[view_type]["logits"].to(self.eval_device)
             out[view_type] = self.get_metrics(logits, gt)
+        # Expose mv_collection per-combo top-1 correctness + hotel/class id of each
+        # combo so the driver can run a hotel-level cluster bootstrap (PLAN §8).
+        if "mv_collection" in results:
+            logits = results["mv_collection"]["logits"]
+            classes = results["mv_collection"]["classes"]
+            preds = torch.argmax(logits, dim=1).cpu().numpy()
+            correct = (preds == classes).astype(np.int64)
+            out["mv_collection"]["per_combo_correct"] = correct
+            out["mv_collection"]["per_combo_hotel_ids"] = np.asarray(classes, dtype=np.int64)
         return out
+
+
+def cluster_bootstrap_ci(
+    correct: np.ndarray,
+    hotel_ids: np.ndarray,
+    n_boot: int = 1000,
+    seed: int = 0,
+    ci: float = 0.95,
+) -> dict:
+    """Hotel-level cluster bootstrap 95% CI for per-combo top-1 accuracy.
+
+    Resamples HOTELS (not combos) with replacement; for each resampled hotel
+    multiset, recomputes the top-1 as the mean of that hotel's combo
+    correctness vectors weighted by combo count (same as a flat mean over all
+    selected combos). Returns ``{"mean", "lo", "hi", "n_boot"}``.
+
+    See PLAN §8 / AUDIT H-3: combos within a hotel are correlated, so a naive
+    per-combo bootstrap underestimates variance.
+    """
+    correct = np.asarray(correct, dtype=np.float64)
+    hotel_ids = np.asarray(hotel_ids)
+    if correct.shape[0] == 0:
+        return {"mean": 0.0, "lo": 0.0, "hi": 0.0, "n_boot": 0}
+
+    # Group combo correctness by hotel.
+    unique_hotels, inverse = np.unique(hotel_ids, return_inverse=True)
+    H = unique_hotels.shape[0]
+    sums = np.bincount(inverse, weights=correct, minlength=H)
+    counts = np.bincount(inverse, minlength=H).astype(np.float64)
+
+    rng = np.random.default_rng(seed)
+    boot_means = np.empty(n_boot, dtype=np.float64)
+    for b in range(n_boot):
+        idx = rng.integers(0, H, size=H)
+        s = sums[idx].sum()
+        c = counts[idx].sum()
+        boot_means[b] = s / c if c > 0 else 0.0
+
+    alpha = (1.0 - ci) / 2.0
+    lo, hi = np.quantile(boot_means, [alpha, 1.0 - alpha])
+    return {
+        "mean": float(correct.mean()),
+        "lo": float(lo),
+        "hi": float(hi),
+        "n_boot": int(n_boot),
+    }
 
 
 @torch.no_grad()

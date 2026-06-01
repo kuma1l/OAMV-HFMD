@@ -42,13 +42,24 @@ def test_baseline_md_loss_shape_and_finite():
 
 
 def test_baseline_md_loss_matches_upstream():
-    """Numerical equality against multi-view-hybrid/loss/loss.py:MutualDistillationLoss."""
+    """Numerical equality against multi-view-hybrid/loss/loss.py:MutualDistillationLoss.
+
+    Path is read from MVHFMD_UPSTREAM env var so the test runs on cloud/CI too;
+    falls back to the local Windows checkout used during development.
+    """
+    import os
     import sys
-    sys.path.insert(0, r"D:\Research-WS\PIVOT\multi-view-hybrid")
+    upstream_path = os.environ.get(
+        "MVHFMD_UPSTREAM", r"D:\Research-WS\PIVOT\multi-view-hybrid"
+    )
+    sys.path.insert(0, upstream_path)
     try:
         from loss.loss import MutualDistillationLoss
     except ImportError:
-        pytest.skip("upstream multi-view-hybrid not available")
+        pytest.skip(
+            f"upstream multi-view-hybrid not available at {upstream_path} "
+            "(set MVHFMD_UPSTREAM to override)"
+        )
 
     from oamv_hfmd.losses import baseline_md_loss
 

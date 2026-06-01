@@ -1,0 +1,37 @@
+# E2-commit (2026-06-01): the corrected decisive A/B. Combined OAMV with the overlap
+# mechanism ACTUALLY ACTIVE and pointed the motivation-aligned way:
+#   - tau_overlap = 0.5  -> overlap weighting is non-inert (cache_dino pre-flight:
+#       median TV from uniform 0.33 vs the inert 0.038 at tau=4 that invalidated the
+#       original E2 run).
+#   - overlap_sign = -1  -> the distillation teacher up-weights COMPLEMENTARY views
+#       (independent info), not redundant near-duplicates.
+#   - sorted MLP(S) embedding (permutation-invariant; model.py option D-1a).
+# One N=4 / seed-42 run, batch 40, vs the EXISTING batch-40 baseline (test_top1 0.6889,
+# results/E1_mvhfmd_upstream/N4_seed42/). Same batch + same seed => clean A/B.
+# Headline -> results/E2_oamvhfmd_commit/N4_seed42/eval_results.json :
+#   test_top1  and  test_top1_ci_hotelcluster  (hotel-level cluster bootstrap, AUDIT H-3).
+inherits: base.yaml
+
+method: "oamvhfmd_combined_commit"
+split_source: "upstream_author_split_2026-05-29"
+
+model:
+  variant: "overlap_aware"             # OverlapAwareHybrid, sorted MLP(S) embed + overlap-weighted L_md
+  num_classes: 7774                    # author split; driver overrides with ds_train.num_classes
+  enable_overlap_embed: true
+
+oracle:
+  kind: "dinov2_s"
+  mlp_hidden: 64
+
+loss:
+  tau_overlap: 0.5                     # ACTIVE (pre-flight verified); the driver aborts if >= 2.0
+  overlap_sign: -1.0                   # up-weight COMPLEMENTARY views in the teacher
+
+paths:
+  data_dir: "hotel_8k_images"
+  out_dir: "./results/E2_oamvhfmd_commit"
+
+sweep:
+  n_views: [4]
+  seeds:   [42]
